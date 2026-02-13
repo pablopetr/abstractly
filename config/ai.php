@@ -16,6 +16,31 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Summary Cache TTL (seconds)
+    |--------------------------------------------------------------------------
+    |
+    | How long to cache AI summaries per paper URL. Papers with cached
+    | summaries skip the AI call on subsequent generations. Set to 0 to
+    | disable summary caching entirely.
+    |
+    */
+
+    'summary_cache_ttl' => (int) env('AI_SUMMARY_CACHE_TTL', 86400),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Batch Delay (milliseconds)
+    |--------------------------------------------------------------------------
+    |
+    | Delay between consecutive AI summarization batches to avoid hitting
+    | provider rate limits. Applied between batches, not before the first.
+    |
+    */
+
+    'batch_delay_ms' => (int) env('AI_BATCH_DELAY_MS', 200),
+
+    /*
+    |--------------------------------------------------------------------------
     | Gemini (default)
     |--------------------------------------------------------------------------
     */

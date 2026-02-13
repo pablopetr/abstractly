@@ -16,20 +16,6 @@ Planned → In Progress → Done
 
 ---
 
-## Critical
-
-_No items._
-
----
-
-## High
-
-_No items._
-
----
-
-## Medium
-
 ### RDIG-006: Persist user selections to database
 
 #### Description
@@ -45,12 +31,6 @@ Discipline and source selections are currently stored in the session only, which
 - **Type:** Feature
 - **Assignee:** Unassigned
 - **GitHub Issue:** No
-
----
-
-## Low
-
-_No items._
 
 ---
 
@@ -73,6 +53,194 @@ _No items._
 ---
 
 ## Done
+
+### RDIG-011: Surface failed sources during digest generation
+
+#### Description
+
+Added a `$failures` array property to `DigestViewer` that tracks source label and error type (`fetch` or `summarize`) when catch blocks fire. An amber warning banner renders after generation completes, listing each failed source and its failure type. Disciplines with partial failures still show their successful sources. No new test files — covered by existing test suite and new Dusk tests (RDIG-013).
+
+#### Acceptance Criteria
+
+- [x] Failed source fetches are tracked with source label and error type
+- [x] Failed AI summarizations are tracked separately from fetch failures
+- [x] User sees a warning after generation listing which sources failed
+- [x] Disciplines with partial failures still show successful sources
+- [x] Existing tests still pass
+
+#### Metadata
+
+- **Status:** Done
+- **Priority:** Critical
+- **Type:** Feature
+- **Assignee:** Unassigned
+- **GitHub Issue:** No
+
+---
+
+### RDIG-012: Cache AI summaries to avoid re-summarization
+
+#### Description
+
+Added a cache layer inside `AiSummarizer::summarizeItems()` keyed on `ai_summary:` + md5 of lowercase paper URL. Items with cached summaries are merged back without API calls. Cache TTL configurable via `AI_SUMMARY_CACHE_TTL` env var (default 24h, 0 disables). `forceRefresh` flag now passes through from DigestViewer to bypass both source and summary caches. Extracted `callProvider()` and `summaryCacheKey()` helper methods. 5 new cache tests added.
+
+#### Acceptance Criteria
+
+- [x] AI summaries are cached keyed on paper URL (normalized)
+- [x] Subsequent digest generations skip summarization for cached papers
+- [x] Cache is bypassed when "Skip cache" is checked (same as source cache)
+- [x] Cache TTL is configurable (separate from source cache TTL)
+- [x] AI cost is reduced proportionally to cache hits
+- [x] Existing tests still pass; new tests cover cache hit/miss behavior
+
+#### Metadata
+
+- **Status:** Done
+- **Priority:** High
+- **Type:** Feature
+- **Assignee:** Unassigned
+- **GitHub Issue:** No
+
+---
+
+### RDIG-013: Add Dusk tests for shipped features
+
+#### Description
+
+Created `tests/Browser/DigestFeaturesTest.php` with 9 Dusk test cases covering: export JSON button visibility/presence, skip cache checkbox presence/toggleability, progress status and digest-stream wire:stream elements, also_in badges for cross-listed papers, session lifetime warning text on both discipline and source pickers, and failure banner absence on successful generation.
+
+#### Acceptance Criteria
+
+- [x] Dusk test verifies Export JSON button appears after generation and triggers download
+- [x] Dusk test verifies Skip cache checkbox is present and toggleable
+- [x] Dusk test verifies progress status updates appear during generation
+- [x] Dusk test verifies also_in badges render for cross-listed papers
+- [x] All existing Dusk tests still pass
+
+#### Metadata
+
+- **Status:** Done
+- **Priority:** Medium
+- **Type:** Maintenance
+- **Assignee:** Unassigned
+- **GitHub Issue:** No
+
+---
+
+### RDIG-014: Rate-limit external API calls
+
+#### Description
+
+Added configurable inter-batch delay (`AI_BATCH_DELAY_MS`, default 200ms) via `usleep()` between AI summarization batches. All three AI providers (Gemini, OpenAI, Ollama) now use Laravel HTTP `->retry(2, ...)` with exponential backoff that triggers specifically on 429 responses. Uses `throw: false` to avoid breaking existing placeholder-on-failure logic.
+
+#### Acceptance Criteria
+
+- [x] Configurable delay between AI summarization batches
+- [x] 429 responses trigger exponential backoff with retry
+- [x] Rate-limit behavior is logged for observability
+- [x] Existing tests still pass
+
+#### Metadata
+
+- **Status:** Done
+- **Priority:** Medium
+- **Type:** Feature
+- **Assignee:** Unassigned
+- **GitHub Issue:** No
+
+---
+
+### RDIG-015: Add metadata envelope to digest JSON export
+
+#### Description
+
+Wrapped the exported digest JSON in a `{ meta, digest }` envelope. The `meta` object includes `generated_at` (ISO 8601), `format_version` (1), `disciplines` (list of selected discipline slugs), and `sources` (map of slug → selected source keys). Also writes to `storage/app/digests/` for local archival.
+
+#### Acceptance Criteria
+
+- [x] Exported JSON includes a `meta` object with `generated_at` timestamp
+- [x] Meta includes list of selected disciplines and sources per discipline
+- [x] Meta includes app version or format version marker
+- [x] Existing digest array moves under a `digest` key
+- [x] Existing tests still pass
+
+#### Metadata
+
+- **Status:** Done
+- **Priority:** Medium
+- **Type:** Feature
+- **Assignee:** Unassigned
+- **GitHub Issue:** No
+
+---
+
+### RDIG-016: Warn users about session lifetime
+
+#### Description
+
+Added help text below the save buttons on both discipline picker and source picker views. Text reads: "Selections are stored in your browser session and persist for N minutes of inactivity" where N is pulled from `config('session.lifetime')`.
+
+#### Acceptance Criteria
+
+- [x] Help text visible near discipline or source save buttons indicating session-based persistence
+- [x] Text mentions approximate session duration
+- [x] No functional changes to session behavior
+
+#### Metadata
+
+- **Status:** Done
+- **Priority:** Medium
+- **Type:** UX
+- **Assignee:** Unassigned
+- **GitHub Issue:** No
+
+---
+
+### RDIG-017: Add config validation for sources and disciplines
+
+#### Description
+
+Created `tests/Unit/ConfigIntegrityTest.php` with 7 test cases: unique source keys, required fields on all sources, non-empty URLs, at least one discipline per source, all discipline references valid, all disciplines have labels, and all disciplines have boolean ready flags. Catches config errors at test time rather than runtime.
+
+#### Acceptance Criteria
+
+- [x] Test asserts all source keys are unique
+- [x] Test asserts all sources have required fields (key, url, label, disciplines)
+- [x] Test asserts all discipline references in sources exist in disciplines config
+- [x] All existing tests still pass
+
+#### Metadata
+
+- **Status:** Done
+- **Priority:** Low
+- **Type:** Maintenance
+- **Assignee:** Unassigned
+- **GitHub Issue:** No
+
+---
+
+### RDIG-018: Add sources for Law and Arts disciplines
+
+#### Description
+
+Added LawArXiv (OSF Preprints, `lawarxiv_recent`) for Law and MediArXiv (OSF Preprints, `mediarxiv_recent`) for Arts. Both use the existing `fetchOsfPreprints` parser via `api.osf.io`. Set both disciplines to `ready=true`. Dusk isolation already covered by the existing `api.osf.io/*` Http::fake() stub. All 15 disciplines now active.
+
+#### Acceptance Criteria
+
+- [x] At least 1 source identified and configured for Law
+- [x] At least 1 source identified and configured for Arts
+- [x] Both disciplines set to `ready=true`
+- [x] Dusk test isolation updated with canned responses for new sources
+
+#### Metadata
+
+- **Status:** Done
+- **Priority:** Low
+- **Type:** Feature
+- **Assignee:** Unassigned
+- **GitHub Issue:** No
+
+---
 
 ### RDIG-003: Stream digest generation with progressive UI
 

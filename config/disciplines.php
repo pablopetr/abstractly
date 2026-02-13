@@ -22,8 +22,8 @@ return [
         // Social/Humanities
         'economics'    => ['label' => 'Economics & Finance',                 'ready' => true],
         'linguistics'  => ['label' => 'Linguistics & Language Science',      'ready' => true],
-        'law'          => ['label' => 'Law & Legal Studies',                 'ready' => false],
-        'arts'         => ['label' => 'Arts & Cultural Studies',             'ready' => false],
+        'law'          => ['label' => 'Law & Legal Studies',                 'ready' => true],
+        'arts'         => ['label' => 'Arts & Cultural Studies',             'ready' => true],
         'education'    => ['label' => 'Education & Learning Sciences',       'ready' => true],
         'communication'=> ['label' => 'Communication & Media Studies',       'ready' => true],
     ],

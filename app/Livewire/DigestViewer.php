@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Storage;
 class DigestViewer extends Component
 {
     public array $digest = [];
+    public array $failures = [];
     public bool $generating = false;
     public bool $forceRefresh = false;
     public int $limitPerSource = 5;
@@ -29,6 +30,7 @@ class DigestViewer extends Component
     public function generate(SourcePreviewer $previewer, AiSummarizer $ai, PaperDeduplicator $deduplicator): void
     {
         $this->generating = true;
+        $this->failures = [];
 
         $discAll = config('disciplines.all', []);
         $readyDisc = collect($discAll)
@@ -45,15 +47,16 @@ class DigestViewer extends Component
         foreach ($disciplines as $slug) {
             $discLabel = $discAll[$slug]['label'] ?? ucfirst($slug);
 
-            $selectedKeys = (array) session("enabled_sources.$slug", []);
-            if (empty($selectedKeys)) {
-                continue;
-            }
-
             $sourcesForSlug = $allSources
                 ->filter(fn ($s) => in_array($slug, $s['disciplines'] ?? [], true))
-                ->whereIn('key', $selectedKeys)
                 ->values();
+
+            $selectedKeys = (array) session("enabled_sources.$slug", []);
+            if (! empty($selectedKeys)) {
+                $sourcesForSlug = $sourcesForSlug->whereIn('key', $selectedKeys)->values();
+            } else {
+                $sourcesForSlug = $sourcesForSlug->take(3);
+            }
 
             if ($sourcesForSlug->isEmpty()) {
                 continue;
@@ -67,6 +70,7 @@ class DigestViewer extends Component
                 try {
                     $items = $previewer->fetch($src, $this->limitPerSource, $this->forceRefresh);
                 } catch (\Throwable $e) {
+                    $this->failures[] = ['source' => $src['label'], 'type' => 'fetch'];
                     $items = [];
                 }
 
@@ -90,8 +94,9 @@ class DigestViewer extends Component
                 $this->stream('progress-status', "Summarizing {$src['label']}…", true);
 
                 try {
-                    $enriched = $ai->summarizeItems($src['label'], $items);
+                    $enriched = $ai->summarizeItems($src['label'], $items, $this->forceRefresh);
                 } catch (\Throwable $e) {
+                    $this->failures[] = ['source' => $src['label'], 'type' => 'summarize'];
                     $enriched = $items;
                 }
 
@@ -121,7 +126,23 @@ class DigestViewer extends Component
 
     public function export()
     {
-        $json = json_encode($this->digest, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        $enabled = (array) session('enabled_disciplines', []);
+        $sourcesPerDiscipline = [];
+        foreach ($enabled as $slug) {
+            $sourcesPerDiscipline[$slug] = (array) session("enabled_sources.$slug", []);
+        }
+
+        $envelope = [
+            'meta' => [
+                'generated_at'  => now()->toIso8601String(),
+                'format_version' => 1,
+                'disciplines'   => $enabled,
+                'sources'       => $sourcesPerDiscipline,
+            ],
+            'digest' => $this->digest,
+        ];
+
+        $json = json_encode($envelope, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         $filename = 'digest-' . now()->format('Y-m-d_His') . '.json';
 
         Storage::disk('local')->put("digests/{$filename}", $json);

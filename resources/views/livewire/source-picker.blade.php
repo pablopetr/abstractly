@@ -101,4 +101,8 @@
             Back to disciplines
         </a>
     </div>
+
+    <p class="mt-3 text-xs text-gray-400">
+        Selections are stored in your browser session and persist for {{ config('session.lifetime', 120) }} minutes of inactivity.
+    </p>
 </div>

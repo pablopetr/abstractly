@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -15,7 +16,52 @@ class AiSummarizer
      *
      * Provider is selected via DIGEST_AI_PROVIDER = gemini | openai | ollama
      */
-    public function summarizeItems(string $sourceLabel, array $items): array
+    public function summarizeItems(string $sourceLabel, array $items, bool $forceRefresh = false): array
+    {
+        $ttl = (int) config('ai.summary_cache_ttl', 86400);
+
+        // Split items into cached (already have summaries) and uncached (need API call).
+        $cached = [];
+        $uncachedIndices = [];
+
+        foreach ($items as $i => $item) {
+            $key = $this->summaryCacheKey($item);
+
+            if (! $forceRefresh && $ttl > 0 && $key && Cache::has($key)) {
+                $cached[$i] = $item + Cache::get($key);
+            } else {
+                $uncachedIndices[] = $i;
+            }
+        }
+
+        // Summarize uncached items via the configured provider.
+        if (! empty($uncachedIndices)) {
+            $uncachedItems = array_map(fn ($i) => $items[$i], $uncachedIndices);
+
+            $freshResults = $this->callProvider($sourceLabel, $uncachedItems);
+
+            foreach ($freshResults as $j => $enriched) {
+                $origIdx = $uncachedIndices[$j];
+                $cached[$origIdx] = $enriched;
+
+                // Store summary fields in cache.
+                $key = $this->summaryCacheKey($items[$origIdx]);
+                if ($key && $ttl > 0) {
+                    Cache::put($key, [
+                        'eli5'     => $enriched['eli5'] ?? '',
+                        'swe'      => $enriched['swe'] ?? '',
+                        'investor' => $enriched['investor'] ?? '',
+                    ], $ttl);
+                }
+            }
+        }
+
+        ksort($cached);
+
+        return array_values($cached);
+    }
+
+    private function callProvider(string $sourceLabel, array $items): array
     {
         $provider = config('ai.provider');
 
@@ -29,6 +75,17 @@ class AiSummarizer
 
         Log::warning('AiSummarizer: Unknown provider "' . $provider . '"; using Gemini.');
         return $this->summarizeItemsWithGemini($sourceLabel, $items);
+    }
+
+    private function summaryCacheKey(array $item): ?string
+    {
+        $url = trim(strtolower($item['url'] ?? ''));
+
+        if ($url === '' || $url === '#') {
+            return null;
+        }
+
+        return 'ai_summary:' . md5($url);
     }
 
     // ---------------------------
@@ -47,13 +104,17 @@ class AiSummarizer
         $batches = array_chunk($items, 5);
         $out = [];
 
-        foreach ($batches as $batch) {
+        foreach ($batches as $batchIdx => $batch) {
+            if ($batchIdx > 0) {
+                $this->batchDelay();
+            }
+
             $prompt = $this->buildJsonPrompt($sourceLabel, $batch);
 
             $resp = Http::timeout(40)
+                ->retry(2, fn ($attempt) => $attempt * 1000, fn ($e) => $e instanceof \Illuminate\Http\Client\RequestException && $e->response->status() === 429, throw: false)
                 ->withHeaders(['x-goog-api-key' => $apiKey])
                 ->post('https://generativelanguage.googleapis.com/v1beta/models/' . $model . ':generateContent', [
-                    // FIX: put response_mime_type inside generationConfig (snake_case)
                     'generationConfig' => [
                         'temperature' => 0.3,
                         'response_mime_type' => 'application/json',
@@ -100,10 +161,15 @@ class AiSummarizer
         $batches = array_chunk($items, 5);
         $out = [];
 
-        foreach ($batches as $batch) {
+        foreach ($batches as $batchIdx => $batch) {
+            if ($batchIdx > 0) {
+                $this->batchDelay();
+            }
+
             $prompt = $this->buildJsonPrompt($sourceLabel, $batch);
 
             $resp = Http::timeout(40)
+                ->retry(2, fn ($attempt) => $attempt * 1000, fn ($e) => $e instanceof \Illuminate\Http\Client\RequestException && $e->response->status() === 429, throw: false)
                 ->withToken($apiKey)
                 ->post('https://api.openai.com/v1/chat/completions', [
                     'model' => $model,
@@ -147,10 +213,15 @@ class AiSummarizer
         $batches = array_chunk($items, 3); // smaller context for local models
         $out = [];
 
-        foreach ($batches as $batch) {
+        foreach ($batches as $batchIdx => $batch) {
+            if ($batchIdx > 0) {
+                $this->batchDelay();
+            }
+
             $prompt = $this->buildJsonPrompt($sourceLabel, $batch);
 
             $resp = Http::timeout(60)
+                ->retry(2, fn ($attempt) => $attempt * 1000, fn ($e) => $e instanceof \Illuminate\Http\Client\RequestException && $e->response->status() === 429, throw: false)
                 ->post($host . '/api/chat', [
                     'model'    => $model,
                     'messages' => [
@@ -182,6 +253,15 @@ class AiSummarizer
     // -----------------
     // Helpers
     // -----------------
+    private function batchDelay(): void
+    {
+        $ms = (int) config('ai.batch_delay_ms', 200);
+
+        if ($ms > 0) {
+            usleep($ms * 1000);
+        }
+    }
+
     private function buildJsonPrompt(string $sourceLabel, array $batch): string
     {
         $list = collect($batch)->values()->map(function ($it, $i) {

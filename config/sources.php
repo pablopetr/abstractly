@@ -503,5 +503,31 @@ return [
             'signal'      => 'latest preprints',
             'notes'       => 'Aggregated agriculture/food preprints via Europe PMC.',
         ],
+
+        // ============================
+        // LAW & LEGAL STUDIES
+        // ============================
+        [
+            'key'         => 'lawarxiv_recent',
+            'label'       => 'LawArXiv — Recent preprints',
+            'kind'        => 'json',
+            'disciplines' => ['law'],
+            'url'         => 'https://api.osf.io/v2/preprints/?filter[provider]=lawarxiv&sort=-date_created&page[size]=25',
+            'signal'      => 'latest preprints',
+            'notes'       => 'Legal scholarship preprints via OSF Preprints API (JSON:API).',
+        ],
+
+        // ============================
+        // ARTS & CULTURAL STUDIES
+        // ============================
+        [
+            'key'         => 'mediarxiv_recent',
+            'label'       => 'MediArXiv — Media & Cultural Studies',
+            'kind'        => 'json',
+            'disciplines' => ['arts'],
+            'url'         => 'https://api.osf.io/v2/preprints/?filter[provider]=mediarxiv&sort=-date_created&page[size]=25',
+            'signal'      => 'latest preprints',
+            'notes'       => 'Media, film, and communication research preprints via OSF Preprints API (JSON:API).',
+        ],
     ],
 ];

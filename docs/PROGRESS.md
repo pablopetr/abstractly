@@ -455,3 +455,70 @@ Replaced the static loading spinner with Livewire 3 streaming. Digest sections n
 - All formal backlog items are complete
 - Law and Arts disciplines still need sources
 - Parking lot ideas available for future work
+
+---
+
+## 2026-02-12 — Gap Analysis Batch: RDIG-011 through RDIG-018
+
+### Summary
+
+Batch implementation of 8 gap-analysis items identified from a tech spec audit. Covers error visibility, AI caching, Dusk E2E coverage, rate limiting, export metadata, session lifetime UX, config validation, and enabling the final two disciplines. All 15 disciplines are now active with 51 total sources.
+
+### What was done
+
+- **RDIG-011 (Critical) — Surface failed sources:**
+  - Added `$failures` array to `DigestViewer`, populated in catch blocks with source label and error type (`fetch` or `summarize`)
+  - Added amber warning banner to `digest-viewer.blade.php` listing failed sources after generation
+
+- **RDIG-012 (High) — Cache AI summaries:**
+  - Added cache layer to `AiSummarizer::summarizeItems()` keyed on `ai_summary:` + md5(lowercase URL)
+  - Extracted `callProvider()` and `summaryCacheKey()` helpers
+  - Configurable via `AI_SUMMARY_CACHE_TTL` env var (default 24h, 0 disables)
+  - `forceRefresh` flag passes through from DigestViewer to bypass both source and summary caches
+  - 5 new unit tests for cache behavior
+
+- **RDIG-013 (Medium) — Dusk tests for shipped features:**
+  - Created `tests/Browser/DigestFeaturesTest.php` with 9 test cases
+  - Covers: export button visibility, skip cache checkbox, streaming elements, also_in badges, session lifetime warning, failure banner
+
+- **RDIG-014 (Medium) — Rate-limit API calls:**
+  - Added `AI_BATCH_DELAY_MS` config (default 200ms) with `usleep()` between AI batches
+  - All 3 providers now use `->retry(2, ...)` with conditional 429 backoff and `throw: false`
+  - Added `batchDelay()` helper to AiSummarizer
+
+- **RDIG-015 (Medium) — Export metadata envelope:**
+  - Wrapped digest JSON export in `{ meta: { generated_at, format_version, disciplines, sources }, digest: [...] }`
+  - Also writes to `storage/app/digests/` for local archival
+
+- **RDIG-016 (Medium) — Session lifetime warning:**
+  - Added help text below save buttons on both discipline-picker and source-picker views
+  - Text reads: "Selections are stored in your browser session and persist for N minutes of inactivity"
+
+- **RDIG-017 (Low) — Config validation:**
+  - Created `tests/Unit/ConfigIntegrityTest.php` with 7 test cases
+  - Validates: unique keys, required fields, non-empty URLs, discipline references, labels, ready flags
+
+- **RDIG-018 (Low) — Law and Arts sources:**
+  - Added LawArXiv (`lawarxiv_recent`) for Law, MediArXiv (`mediarxiv_recent`) for Arts (both OSF Preprints)
+  - Set both disciplines to `ready=true` — all 15 disciplines now active
+  - Existing `api.osf.io/*` Http::fake() stub covers new sources
+
+### Test suite
+
+- 64 tests, 538 assertions — all passing
+- 9 new Dusk test cases (DigestFeaturesTest)
+- 7 new unit tests (ConfigIntegrityTest)
+- 5 new unit tests (AiSummarizerTest cache behavior)
+
+### Decisions made
+
+- **Batch implementation** — User explicitly requested all 8 items be worked on together rather than one-at-a-time
+- **429 retry with `throw: false`** — Necessary to preserve existing placeholder-on-failure logic in AiSummarizer
+- **LawArXiv and MediArXiv** selected as sources for Law and Arts respectively — both are OSF Preprints servers, reusing the existing `fetchOsfPreprints` parser
+- **No new Http::fake() stubs needed** — existing `api.osf.io/*` wildcard covers all OSF-based sources
+
+### What's next
+
+- Commit all changes
+- Documentation sync (triggered by 5+ backlog items completed)
+- Parking lot ideas available for future work

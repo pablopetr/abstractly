@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Services\AiSummarizer;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -297,6 +298,191 @@ class AiSummarizerTest extends TestCase
         // Falls back to Gemini, which has no API key → placeholders
         $this->assertCount(1, $result);
         $this->assertStringContainsString('GOOGLE_API_KEY', $result[0]['eli5']);
+    }
+
+    // ------------------------------------------------------------------
+    // mergeBatchSummaries — missing index fills placeholder
+    // ------------------------------------------------------------------
+
+    // ------------------------------------------------------------------
+    // Summary caching
+    // ------------------------------------------------------------------
+
+    public function test_summary_cached_after_first_call(): void
+    {
+        config([
+            'ai.provider'            => 'gemini',
+            'ai.gemini.api_key'      => 'fake-key',
+            'ai.gemini.model'        => 'gemini-2.0-flash',
+            'ai.summary_cache_ttl'   => 3600,
+        ]);
+
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [[
+                    'content' => [
+                        'parts' => [[
+                            'text' => json_encode([
+                                'summaries' => [
+                                    ['index' => 1, 'eli5' => 'Cached eli5.', 'swe' => 'Cached swe.', 'investor' => 'Cached inv.'],
+                                ],
+                            ]),
+                        ]],
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        $items = [
+            ['title' => 'Paper A', 'url' => 'https://example.com/a', 'summary' => 'Abstract A'],
+        ];
+
+        $this->summarizer->summarizeItems('Test Source', $items);
+
+        $cacheKey = 'ai_summary:' . md5('https://example.com/a');
+        $this->assertTrue(Cache::has($cacheKey));
+        $this->assertSame('Cached eli5.', Cache::get($cacheKey)['eli5']);
+    }
+
+    public function test_cached_summary_returned_without_http(): void
+    {
+        config([
+            'ai.provider'            => 'gemini',
+            'ai.gemini.api_key'      => 'fake-key',
+            'ai.gemini.model'        => 'gemini-2.0-flash',
+            'ai.summary_cache_ttl'   => 3600,
+        ]);
+
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [[
+                    'content' => [
+                        'parts' => [[
+                            'text' => json_encode([
+                                'summaries' => [
+                                    ['index' => 1, 'eli5' => 'Fresh.', 'swe' => 'Fresh.', 'investor' => 'Fresh.'],
+                                ],
+                            ]),
+                        ]],
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        $items = [
+            ['title' => 'Paper A', 'url' => 'https://example.com/a', 'summary' => 'Abstract A'],
+        ];
+
+        $this->summarizer->summarizeItems('Test Source', $items);
+        $result = $this->summarizer->summarizeItems('Test Source', $items);
+
+        Http::assertSentCount(1);
+        $this->assertSame('Fresh.', $result[0]['eli5']);
+    }
+
+    public function test_force_refresh_bypasses_summary_cache(): void
+    {
+        config([
+            'ai.provider'            => 'gemini',
+            'ai.gemini.api_key'      => 'fake-key',
+            'ai.gemini.model'        => 'gemini-2.0-flash',
+            'ai.summary_cache_ttl'   => 3600,
+        ]);
+
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [[
+                    'content' => [
+                        'parts' => [[
+                            'text' => json_encode([
+                                'summaries' => [
+                                    ['index' => 1, 'eli5' => 'E.', 'swe' => 'S.', 'investor' => 'I.'],
+                                ],
+                            ]),
+                        ]],
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        $items = [
+            ['title' => 'Paper A', 'url' => 'https://example.com/a', 'summary' => 'Abstract A'],
+        ];
+
+        $this->summarizer->summarizeItems('Test Source', $items);
+        $this->summarizer->summarizeItems('Test Source', $items, forceRefresh: true);
+
+        Http::assertSentCount(2);
+    }
+
+    public function test_summary_cache_disabled_when_ttl_zero(): void
+    {
+        config([
+            'ai.provider'            => 'gemini',
+            'ai.gemini.api_key'      => 'fake-key',
+            'ai.gemini.model'        => 'gemini-2.0-flash',
+            'ai.summary_cache_ttl'   => 0,
+        ]);
+
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [[
+                    'content' => [
+                        'parts' => [[
+                            'text' => json_encode([
+                                'summaries' => [
+                                    ['index' => 1, 'eli5' => 'E.', 'swe' => 'S.', 'investor' => 'I.'],
+                                ],
+                            ]),
+                        ]],
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        $items = [
+            ['title' => 'Paper A', 'url' => 'https://example.com/a', 'summary' => 'Abstract A'],
+        ];
+
+        $this->summarizer->summarizeItems('Test Source', $items);
+        $this->summarizer->summarizeItems('Test Source', $items);
+
+        Http::assertSentCount(2);
+    }
+
+    public function test_hash_url_items_not_cached(): void
+    {
+        config([
+            'ai.provider'            => 'gemini',
+            'ai.gemini.api_key'      => 'fake-key',
+            'ai.gemini.model'        => 'gemini-2.0-flash',
+            'ai.summary_cache_ttl'   => 3600,
+        ]);
+
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [[
+                    'content' => [
+                        'parts' => [[
+                            'text' => json_encode([
+                                'summaries' => [
+                                    ['index' => 1, 'eli5' => 'E.', 'swe' => 'S.', 'investor' => 'I.'],
+                                ],
+                            ]),
+                        ]],
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        $items = [
+            ['title' => 'Paper A', 'url' => '#', 'summary' => 'Abstract A'],
+        ];
+
+        $this->summarizer->summarizeItems('Test Source', $items);
+        $this->summarizer->summarizeItems('Test Source', $items);
+
+        Http::assertSentCount(2);
     }
 
     // ------------------------------------------------------------------

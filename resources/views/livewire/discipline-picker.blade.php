@@ -76,7 +76,7 @@
     </div>
 
     <div class="mt-8 flex flex-wrap items-center gap-3">
-        <button wire:click="save" type="button"
+        <button wire:click="save" x-on:click="$nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }))" type="button"
                 class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg px-4 py-2.5 transition">
             Save selection
         </button>
@@ -86,4 +86,8 @@
             View digest
         </a>
     </div>
+
+    <p class="mt-3 text-xs text-gray-400">
+        Selections are stored in your browser session and persist for {{ config('session.lifetime', 120) }} minutes of inactivity.
+    </p>
 </div>
