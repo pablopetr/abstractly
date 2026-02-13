@@ -73,7 +73,7 @@ Mathematics
 - Selection stored in session (`enabled_disciplines`)
 - Only `ready=true` disciplines are selectable and participate in digest generation
 - Non-ready disciplines appear with "Coming soon" badge and are visually disabled
-- Currently 15 disciplines defined; 13 are `ready=true` (only Law and Arts remain disabled)
+- All 15 disciplines are `ready=true` and selectable
 
 **Configuration:** `config/disciplines.php`
 
@@ -101,7 +101,7 @@ Includes alias mapping for common typos/synonyms (e.g., `neuro` → `neuroscienc
 
 Fields: `key`, `label`, `kind` (primary | json), `disciplines[]`, `url`, `signal`, `notes`
 
-**Current sources (49 entries across 13 disciplines):**
+**Current sources (51 entries across 15 disciplines):**
 
 | Discipline | Sources | Provider Types |
 |------------|---------|---------------|
@@ -115,6 +115,8 @@ Fields: `key`, `label`, `kind` (primary | json), `disciplines[]`, `url`, `signal
 | Pharmacology | 2 (arXiv q-bio.BM + Europe PMC) | Atom, JSON |
 | Agriculture | 2 (arXiv q-bio.PE + Europe PMC) | Atom, JSON |
 | Psychology | 1 (PsyArXiv via OSF) + shared q-bio.NC | JSON, Atom |
+| Law | 1 (LawArXiv via OSF) | JSON |
+| Arts | 1 (MediArXiv via OSF) | JSON |
 | Linguistics | 1 (arXiv cs.CL) | Atom |
 | Education | 1 (EdArXiv via OSF) | JSON |
 | Communication | 1 (SocArXiv via OSF) | JSON |
@@ -269,7 +271,7 @@ Parses multiple feed formats via key-based dispatch:
 |--------|--------------|---------|
 | Atom | `fetchArxiv()` | All arXiv feeds (math, cs, econ, physics, q-bio, eess, astro-ph) |
 | bioRxiv/medRxiv JSON | `fetchRxivJson()` | bioRxiv, medRxiv |
-| OSF Preprints JSON:API | `fetchOsfPreprints()` | PsyArXiv, SocArXiv, EdArXiv |
+| OSF Preprints JSON:API | `fetchOsfPreprints()` | PsyArXiv, SocArXiv, EdArXiv, LawArXiv, MediArXiv |
 | Europe PMC REST JSON | `fetchEuropePmc()` | Europe PMC topic searches |
 | RSS/Atom (fallback) | `fetchRssOrAtom()` | Any unrecognized source |
 
@@ -345,13 +347,14 @@ Graceful degradation: placeholder text on failure per batch.
 - **Run command:** `composer test` (clears config cache, runs `php artisan test`)
 - **Environment:** In-memory SQLite, array session/cache, sync queue
 
-**Unit test coverage (52 test cases across 4 files):**
+**Unit test coverage (63 test cases across 5 files):**
 
 | Test File | Cases | Coverage |
 |-----------|-------|----------|
-| `SourcePreviewerTest` | 17 | All 5 parser types (Atom, bioRxiv JSON, OSF JSON:API, Europe PMC, RSS/Atom fallback), limit, empty feed, HTTP errors, cache hit/miss/bypass/key isolation/TTL kill switch |
-| `AiSummarizerTest` | 9 | Gemini/OpenAI/Ollama happy paths, missing API keys, API failures, batch splitting, unknown provider fallback, missing index placeholder |
+| `SourcePreviewerTest` | 16 | All 5 parser types (Atom, bioRxiv JSON, OSF JSON:API, Europe PMC, RSS/Atom fallback), limit, empty feed, HTTP errors, cache hit/miss/bypass/key isolation/TTL kill switch |
+| `AiSummarizerTest` | 14 | Gemini/OpenAI/Ollama happy paths, missing API keys, API failures, batch splitting, unknown provider fallback, missing index placeholder, summary cache hit/miss/bypass/TTL kill switch/hash URL exclusion |
 | `PaperDeduplicatorTest` | 25 | normalizeUrl (null returns for #/empty/whitespace, transformations: lowercase, http→https, trailing slash, arXiv version strip, non-arXiv/DOI preservation), dedup fast paths (empty input, single source), core behavior (single/multi-source dupe, mixed unique/dupe, also_in annotation, no also_in on unique), edge cases (#/empty URLs, http/https normalization, arXiv version normalization, fully-emptied source, DOI dedup, source order preservation, also_in survives + merge) |
+| `ConfigIntegrityTest` | 7 | Unique source keys, required fields, non-empty URLs, at least one discipline per source, valid discipline references, discipline labels, discipline ready flags |
 | `ExampleTest` | 1 | Basic assertion |
 
 All tests use `Http::fake()` — no real external requests. `composer test` clears config cache and runs the full suite.
@@ -365,16 +368,17 @@ All tests use `Http::fake()` — no real external requests. `composer test` clea
 - **Driver:** `chrome-headless-shell-mac-arm64` (macOS ARM64)
 - **Window:** 1920x1080
 
-**E2E test coverage (37 test cases across 7 files):**
+**E2E test coverage (47 test cases across 8 files):**
 
 | Test File | Cases | Coverage |
 |-----------|-------|----------|
 | `ExampleTest` | 1 | Basic root redirect |
-| `NavigationTest` | 9 | Nav links, breadcrumbs, active highlights, 404 handling |
+| `NavigationTest` | 10 | Nav links, breadcrumbs, active highlights, 404 handling |
 | `DisciplineSelectionTest` | 7 | Toggle, select all/none, save persistence, disabled states |
 | `SourceSelectionTest` | 8 | Toggle, badges, select all/none, save, preview links |
 | `SourcePreviewTest` | 7 | Item display, breadcrumbs, back nav, bioRxiv, 404s |
 | `DigestGenerationTest` | 5 | Empty state, generate button, full flow, color sections |
+| `DigestFeaturesTest` | 9 | Export button visibility, skip cache checkbox, streaming elements, also_in badges, session lifetime warning, failure banner |
 
 **Page objects:** `tests/Browser/Pages/` (HomePage, abstract Page)
 
@@ -393,8 +397,8 @@ Not yet established. E2E tests cover the primary user workflow end-to-end (disci
 - Session-based state means digest is lost on session expiry (mitigated by JSON export, RDIG-010)
 - ~~No caching of source results~~ — **Resolved:** RDIG-002 added configurable TTL caching
 - ~~No deduplication if a paper appears in multiple sources~~ — **Resolved:** RDIG-008 added per-discipline dedup
-- arXiv API rate limiting (unclear enforcement)
-- AI provider cost at scale (Gemini free tier has limits; mitigated by dedup reducing API calls)
+- arXiv API rate limiting (unclear enforcement; mitigated by RDIG-014 inter-batch delays and 429 retry)
+- AI provider cost at scale (Gemini free tier has limits; mitigated by dedup reducing API calls + summary caching avoiding re-summarization)
 - ~~.env.example doesn't document AI-specific env vars~~ — **Resolved:** RDIG-001 added all 6 vars
 
 ---
@@ -405,7 +409,7 @@ Not yet established. E2E tests cover the primary user workflow end-to-end (disci
 
 - ~~Move digest generation to queue jobs~~ → **Revised:** Livewire streaming (RDIG-003). No queue needed.
 - ~~Cache source results~~ → **Done:** RDIG-002 (configurable TTL, artisan clear command)
-- Avoid re-summarizing unchanged papers
+- ~~Avoid re-summarizing unchanged papers~~ → **Done:** RDIG-012 (AI summary caching keyed on URL md5, configurable TTL)
 - ~~Persist user selections to database~~ → **Archived:** RDIG-006. No database; file sessions are sufficient.
 
 ### Phase 3 — Intelligence
