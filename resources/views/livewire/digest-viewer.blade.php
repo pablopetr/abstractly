@@ -54,19 +54,25 @@
         </div>
     </div>
 
-    {{-- Loading overlay --}}
+    {{-- Progress bar (visible during generate) --}}
     <div wire:loading wire:target="generate" class="mb-6">
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-            <svg class="animate-spin h-8 w-8 text-indigo-600 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p class="text-gray-700 font-medium">Generating your digest&hellip;</p>
-            <p class="text-sm text-gray-500 mt-1">Fetching papers and running AI summaries. This may take a minute or two.</p>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <div class="flex items-center gap-3">
+                <svg class="animate-spin h-5 w-5 text-indigo-600 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p wire:stream="progress-status" class="text-sm text-gray-700 font-medium">Starting generation&hellip;</p>
+            </div>
         </div>
     </div>
 
-    {{-- Empty state --}}
+    {{-- Streamed results (visible during generate, appended progressively) --}}
+    <div wire:loading wire:target="generate">
+        <div wire:stream="digest-stream"></div>
+    </div>
+
+    {{-- Final content (hidden during generate) --}}
     @php $hasAny = !empty($digest) && collect($digest)->sum(fn($d) => count($d['sections'] ?? [])) > 0; @endphp
 
     <div wire:loading.remove wire:target="generate">
@@ -84,62 +90,9 @@
             </div>
         @else
             {{-- Digest content --}}
-            <div class="space-y-8">
-                @foreach ($digest as $d)
-                    <section>
-                        <h2 class="text-xl font-semibold text-gray-900 mb-4">{{ $d['discipline'] }}</h2>
-
-                        <div class="space-y-4">
-                            @foreach ($d['sections'] as $sec)
-                                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                                    <h3 class="font-semibold text-gray-900 mb-3">{{ $sec['source'] }}</h3>
-
-                                    <div class="space-y-4">
-                                        @foreach ($sec['items'] as $it)
-                                            <div class="rounded-lg border border-gray-100 bg-gray-50/50 p-4">
-                                                <a href="{{ $it['url'] }}" target="_blank" rel="noopener"
-                                                   class="font-medium text-indigo-600 hover:text-indigo-800 transition">
-                                                    {{ $it['title'] }}
-                                                </a>
-
-                                                @if (!empty($it['summary']))
-                                                    <p class="text-xs text-gray-500 mt-1 line-clamp-3">{{ $it['summary'] }}</p>
-                                                @endif
-
-                                                <div class="mt-3 space-y-2">
-                                                    {{-- ELI5 — green --}}
-                                                    @if (!empty($it['eli5']))
-                                                        <div class="border-l-4 border-green-400 pl-3 py-1">
-                                                            <div class="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">ELI5</div>
-                                                            <p class="text-sm text-gray-700">{{ $it['eli5'] }}</p>
-                                                        </div>
-                                                    @endif
-
-                                                    {{-- SWE — blue --}}
-                                                    @if (!empty($it['swe']))
-                                                        <div class="border-l-4 border-blue-400 pl-3 py-1">
-                                                            <div class="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-0.5">Solo SWE</div>
-                                                            <p class="text-sm text-gray-700">{{ $it['swe'] }}</p>
-                                                        </div>
-                                                    @endif
-
-                                                    {{-- Investor — amber --}}
-                                                    @if (!empty($it['investor']))
-                                                        <div class="border-l-4 border-amber-400 pl-3 py-1">
-                                                            <div class="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-0.5">Investor</div>
-                                                            <p class="text-sm text-gray-700">{{ $it['investor'] }}</p>
-                                                        </div>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </section>
-                @endforeach
-            </div>
+            @foreach ($digest as $d)
+                @include('livewire.partials.digest-section', ['d' => $d])
+            @endforeach
         @endif
     </div>
 </div>

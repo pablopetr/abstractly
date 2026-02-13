@@ -325,3 +325,61 @@ Two maintenance backlog items completed as a batch. Deleted dead legacy controll
 
 - Remaining backlog: RDIG-002 (caching, in progress separately), RDIG-003 (queue jobs), RDIG-008 (dedup)
 - Law and Arts disciplines still need sources
+
+---
+
+## 2026-02-12 — Source Fetch Caching (RDIG-002)
+
+### Summary
+
+Added a cache layer to `SourcePreviewer::fetch()` with configurable TTL. Repeated digest generations within the TTL window now return cached results without issuing HTTP requests. Cache bypass is available via UI checkbox, query parameter, and artisan command.
+
+### What was done
+
+- **`config/sources.php`:** Added `'cache_ttl' => env('SOURCE_CACHE_TTL', 3600)` config key
+- **`.env.example`:** Added `SOURCE_CACHE_TTL=3600` with descriptive comment block
+- **`app/Services/SourcePreviewer.php`:** Cache read/write wrapping the `match` dispatch in `fetch()`. Cache key is `source_preview:` + md5 of URL + limit. TTL=0 disables caching entirely. `$forceRefresh` parameter forgets key before fetching. Exceptions bubble up uncached.
+- **`app/Livewire/DigestViewer.php`:** Added `public bool $forceRefresh = false` property, passed through to `fetch()`
+- **`app/Http/Controllers/SourceController.php`:** Reads `?fresh=1` query param, passes as `$forceRefresh` to `fetch()`
+- **`app/Console/Commands/ClearSourceCache.php`:** New artisan command `source:clear-cache` that calls `Cache::flush()`
+- **`resources/views/livewire/digest-viewer.blade.php`:** Added "Skip cache" checkbox bound to `wire:model="forceRefresh"` next to the Generate button
+- **`tests/Unit/SourcePreviewerTest.php`:** 5 new test cases — cache on first call, cached return without HTTP, force refresh bypass, different limits = different keys, TTL=0 disables caching
+- **Documentation:** BACKLOG.md (RDIG-002 moved to Done), PROGRESS.md (this entry)
+- Committed as `0aeab73`
+
+### Decisions made
+
+- **Cache inside `fetch()`** rather than at the caller level — all callers (DigestViewer, SourceController) benefit automatically
+- **`Cache::flush()` in artisan command** — safe because nothing else uses the cache store in this app
+- **TTL=0 as kill switch** — allows disabling caching entirely without code changes
+- **Exceptions not cached** — transient failures should be retried on the next call, not served from cache
+
+### What's next
+
+- Remaining backlog: RDIG-003 (queue jobs), RDIG-008 (dedup)
+- Law and Arts disciplines still need sources
+
+---
+
+## 2026-02-12 — RDIG-003 Revised: Streaming over Queue
+
+### Summary
+
+Revised RDIG-003 from "move digest generation to a queued job" to "stream digest generation with progressive UI using Livewire 3's `$this->stream()`." A full queue stack (driver, workers, polling, failure handling) is unnecessary overhead for a local single-user app. Livewire streaming achieves the same UX goal — progressive results instead of a blocked spinner — without infrastructure changes.
+
+### What was done
+
+- **BACKLOG.md:** Rewrote RDIG-003 title, description, and acceptance criteria to reflect the streaming approach. Added context on why the queue approach was dropped and how RDIG-002 (caching) complements this change.
+- **PROGRESS.md:** This entry.
+
+### Decisions made
+
+- **Streaming over queuing** — `$this->stream()` pushes partial HTML to the browser as each source completes. No queue driver, workers, or polling needed.
+- **Queue approach archived** — original description preserved in git history (pre-edit state) but the backlog now reflects the revised plan
+- **Caching as complement** — RDIG-002's cache layer means only cold first-run generations are slow; streaming addresses the UX of those cold runs specifically
+
+### What's next
+
+- Implement RDIG-003 (Livewire streaming)
+- Remaining backlog: RDIG-008 (dedup)
+- Law and Arts disciplines still need sources

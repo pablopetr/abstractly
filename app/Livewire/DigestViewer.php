@@ -42,6 +42,8 @@ class DigestViewer extends Component
         $digest = [];
 
         foreach ($disciplines as $slug) {
+            $discLabel = $discAll[$slug]['label'] ?? ucfirst($slug);
+
             $selectedKeys = (array) session("enabled_sources.$slug", []);
             if (empty($selectedKeys)) {
                 continue;
@@ -58,6 +60,8 @@ class DigestViewer extends Component
 
             $sections = [];
             foreach ($sourcesForSlug as $src) {
+                $this->stream('progress-status', "Fetching {$src['label']}…", true);
+
                 try {
                     $items = $previewer->fetch($src, $this->limitPerSource, $this->forceRefresh);
                 } catch (\Throwable $e) {
@@ -66,6 +70,8 @@ class DigestViewer extends Component
                 if (empty($items)) {
                     continue;
                 }
+
+                $this->stream('progress-status', "Summarizing {$src['label']}…", true);
 
                 try {
                     $enriched = $ai->summarizeItems($src['label'], $items);
@@ -80,11 +86,15 @@ class DigestViewer extends Component
             }
 
             if (! empty($sections)) {
-                $digest[] = [
-                    'discipline' => $discAll[$slug]['label'] ?? ucfirst($slug),
+                $entry = [
+                    'discipline' => $discLabel,
                     'slug'       => $slug,
                     'sections'   => $sections,
                 ];
+                $digest[] = $entry;
+
+                $html = view('livewire.partials.digest-section', ['d' => $entry])->render();
+                $this->stream('digest-stream', $html, false);
             }
         }
 

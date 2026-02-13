@@ -24,43 +24,21 @@ _No items._
 
 ## High
 
-### RDIG-002: Cache source fetch results
+### RDIG-003: Stream digest generation with progressive UI
 
 #### Description
 
-Every digest generation re-fetches all feeds (arXiv, bioRxiv, medRxiv, OSF Preprints, Europe PMC — 49 sources total) with no caching layer. With 13 active disciplines, a full generation can issue dozens of HTTP requests. Repeated generation within the same session or across short intervals still hits external APIs, wasting time and risking rate limiting (arXiv enforcement is unclear but documented as a concern). A cache layer with a configurable TTL (e.g., 1 hour) should sit between `SourcePreviewer::fetch()` and the external HTTP calls, keyed on source URL and limit.
+Digest generation currently runs synchronously inside the `DigestViewer` Livewire component with a 120-second timeout. This blocks the browser for the full duration and provides no progress feedback beyond a spinner. The original plan was to dispatch generation to a queued job, but that introduces unnecessary infrastructure (queue driver, workers, polling) for a local single-user app.
+
+**Revised approach:** Use Livewire 3's `$this->stream()` to push partial results to the browser as each source/discipline completes. The generation remains synchronous on the server but the UI renders progressively — results appear section-by-section instead of all-at-once after a long wait. No queue, no workers, no polling. The source fetch cache (RDIG-002) already makes repeated generations fast; streaming addresses the UX of cold first-run generations.
 
 #### Acceptance Criteria
 
-- [ ] Source fetch results are cached with a configurable TTL
-- [ ] Cache key includes source URL and limit parameter
-- [ ] Cached results are returned without HTTP requests on subsequent calls within TTL
-- [ ] Cache can be bypassed or cleared manually (e.g., via artisan command or force-refresh flag)
-- [ ] Existing tests still pass; new tests cover cache hit/miss behavior
-
-#### Metadata
-
-- **Status:** Planned
-- **Priority:** High
-- **Type:** Feature
-- **Assignee:** Unassigned
-- **GitHub Issue:** No
-
----
-
-### RDIG-003: Move digest generation to a queued job
-
-#### Description
-
-Digest generation currently runs synchronously inside the `DigestViewer` Livewire component with a 120-second timeout. This blocks the browser for the full duration, risks timeout on slow AI providers or many sources, and provides no progress feedback beyond a spinner. Generation should be dispatched to a queue job, with the Livewire component polling for completion or receiving an event when the job finishes. This unblocks the UI and makes generation more resilient to transient failures.
-
-#### Acceptance Criteria
-
-- [ ] Digest generation dispatched as a queued job
-- [ ] UI shows meaningful progress state while job runs (polling or event-based)
-- [ ] User can navigate away and return to see completed digest
-- [ ] Timeout and failure handling work correctly in the queued context
-- [ ] Existing Dusk E2E tests updated to account for async generation flow
+- [ ] Digest results stream to the UI progressively as each discipline/source completes
+- [ ] User sees which source is currently being processed
+- [ ] Full digest is available in session after generation completes (existing behavior preserved)
+- [ ] Existing tests still pass
+- [ ] No queue infrastructure required
 
 #### Metadata
 
@@ -136,6 +114,30 @@ _No items._
 ---
 
 ## Done
+
+### RDIG-002: Cache source fetch results
+
+#### Description
+
+Added a cache layer inside `SourcePreviewer::fetch()` that wraps all HTTP fetching. Cache key is `source_preview:` + md5 of URL + limit. TTL is configurable via `SOURCE_CACHE_TTL` env var (default 1 hour, 0 disables caching entirely). A `$forceRefresh` parameter bypasses cache in both the Livewire digest viewer (checkbox) and the source preview controller (`?fresh=1` query param). An `artisan source:clear-cache` command provides manual clearing. Five new unit tests cover cache hit, cache miss, force refresh, different-limit key isolation, and TTL=0 kill switch. All 27 tests pass. Committed as `0aeab73`.
+
+#### Acceptance Criteria
+
+- [x] Source fetch results are cached with a configurable TTL
+- [x] Cache key includes source URL and limit parameter
+- [x] Cached results are returned without HTTP requests on subsequent calls within TTL
+- [x] Cache can be bypassed or cleared manually (artisan command + force-refresh flag + UI checkbox)
+- [x] Existing tests still pass; new tests cover cache hit/miss behavior
+
+#### Metadata
+
+- **Status:** Done
+- **Priority:** High
+- **Type:** Feature
+- **Assignee:** Unassigned
+- **GitHub Issue:** No
+
+---
 
 ### RDIG-007: Expand beyond single discipline
 
