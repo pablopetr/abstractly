@@ -15,7 +15,7 @@
                                     {{ $it['title'] }}
                                 </a>
                                 @if (isset($savedUrls))
-                                    <button wire:click="toggleSave({{ @js($it['url']) }})"
+                                    <button wire:click="toggleSave('{{ $it['url'] }}')"
                                             title="{{ in_array($it['url'], $savedUrls) ? 'Remove from saved' : 'Save paper' }}"
                                             class="shrink-0 p-1 rounded hover:bg-gray-200 transition"
                                             aria-label="{{ in_array($it['url'], $savedUrls) ? 'Remove from saved' : 'Save paper' }}">

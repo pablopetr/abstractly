@@ -37,7 +37,7 @@ Discipline and source selections are currently stored in the session only, which
 ## Parking Lot
 
 - **Research radar view** — Visual overview of trending research areas across disciplines
-- **Saved papers** — Bookmark individual papers from the digest for later reference
+
 - **Personal trend tracking** — Track which topics and disciplines the user engages with over time
 - **Research-to-experiment mapping** — Connect papers to personal project ideas or hypotheses
 - **The Shelf integration** — Pipeline from research digest into the attention-management app (cross-project)
@@ -53,6 +53,33 @@ _No items._
 ---
 
 ## Done
+
+### RDIG-019: Saved Papers
+
+#### Description
+
+Added a "Saved Papers" feature that lets users bookmark individual papers from the digest, view them on a dedicated `/saved` page, and export just the saved collection as JSON. Papers persist in a local JSON file (`storage/app/saved-papers.json`), surviving session expiry — unlike the digest itself, which is session-bound. New `SavedPapersRepository` service handles all read/write operations with in-memory cache per request. Bookmark toggle button on each paper card in the digest view (filled amber = saved, outline gray = not saved). Dedicated Saved Papers page with discipline/source badges, relative timestamps, remove/clear/export actions. Nav link with amber count badge. 20 new unit tests for the repository, 3 new Dusk test cases.
+
+#### Acceptance Criteria
+
+- [x] Bookmark toggle button on each paper card in the digest view
+- [x] Saved papers persist in a local JSON file across sessions
+- [x] Dedicated `/saved` page with paper cards, remove, clear all, and export
+- [x] Nav link with count badge when papers are saved
+- [x] Export saved papers as JSON with metadata envelope
+- [x] 20 unit tests for SavedPapersRepository
+- [x] 3 Dusk test cases for bookmark flow
+- [x] All existing tests still pass (84 total)
+
+#### Metadata
+
+- **Status:** Done
+- **Priority:** Medium
+- **Type:** Feature
+- **Assignee:** Unassigned
+- **GitHub Issue:** No
+
+---
 
 ### RDIG-011: Surface failed sources during digest generation
 

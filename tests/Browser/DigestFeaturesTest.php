@@ -168,4 +168,53 @@ class DigestFeaturesTest extends DuskTestCase
             $browser->assertDontSee('failed during generation');
         });
     }
+
+    // ------------------------------------------------------------------
+    // Saved papers — bookmark button
+    // ------------------------------------------------------------------
+
+    public function test_bookmark_button_present_on_generated_digest(): void
+    {
+        $this->browse(function (Browser $browser) {
+            $this->generateDigest($browser);
+
+            $browser->assertPresent('[wire\:click^="toggleSave"]');
+        });
+    }
+
+    public function test_bookmark_toggle_saves_paper_to_saved_page(): void
+    {
+        $this->browse(function (Browser $browser) {
+            $this->generateDigest($browser);
+
+            // Click the first bookmark button to save a paper
+            $browser->click('[wire\:click^="toggleSave"]')
+                ->pause(500);
+
+            // Navigate to saved page and verify the paper appears
+            $browser->visit('/saved')
+                ->waitForText('Saved Papers')
+                ->assertSee('1 paper saved')
+                ->assertPresent('[wire\:click^="removePaper"]');
+        });
+    }
+
+    public function test_saved_page_shows_empty_state(): void
+    {
+        $this->browse(function (Browser $browser) {
+            $browser->visit('/saved')
+                ->assertSee('No saved papers')
+                ->assertSee('Bookmark papers from your');
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Teardown — clean saved papers file
+    // ------------------------------------------------------------------
+
+    protected function tearDown(): void
+    {
+        @unlink(storage_path('app/saved-papers.json'));
+        parent::tearDown();
+    }
 }

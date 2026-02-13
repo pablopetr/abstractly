@@ -8,7 +8,7 @@ A research radar for tracking scientific trends and translating emerging techniq
 
 ## Demo
 
-*Coming soon — screenshots and live link to follow.*
+![Digest example — Mathematics / Number Theory with ELI5, Solo SWE, and Investor summaries](docs/images/digest-example.png)
 
 ---
 
@@ -101,7 +101,7 @@ Copy `.env.example` to `.env` and configure:
 ## Testing
 
 ```bash
-# Unit + feature tests (64 tests, 538 assertions)
+# Unit + feature tests (84 tests, 587 assertions)
 composer test
 
 # E2E browser tests (47 tests via Laravel Dusk)

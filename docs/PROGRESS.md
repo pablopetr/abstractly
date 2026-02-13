@@ -522,3 +522,54 @@ Batch implementation of 8 gap-analysis items identified from a tech spec audit. 
 - Commit all changes
 - Documentation sync (triggered by 5+ backlog items completed)
 - Parking lot ideas available for future work
+
+---
+
+## 2026-02-13 — Saved Papers Feature (RDIG-019)
+
+### Summary
+
+Added a "Saved Papers" feature that lets users bookmark individual papers from the digest for later reference. Papers persist in a local JSON file (`storage/app/saved-papers.json`), surviving session expiry. Includes a dedicated `/saved` page with viewing, removing, and exporting capabilities, plus a nav link with count badge.
+
+### What was done
+
+- **New file: `app/Services/SavedPapersRepository.php`** — Stateless read/write service with in-memory cache per request. Public methods: `all()`, `save()`, `remove()`, `has()`, `savedUrls()`, `count()`, `clear()`, `export()`. Constructor accepts optional `$path` for testability. File format: `{ format_version: 1, papers: [...] }`.
+
+- **New file: `tests/Unit/SavedPapersRepositoryTest.php`** — 20 test cases across 7 groups: empty state (4), save (7 — persist, saved_at, field preservation, multiple, ordering, dedup, timestamp update), remove (3), clear (1), savedUrls (1), export (2), file format (2 — format_version, corruption recovery).
+
+- **Modified: `app/Livewire/DigestViewer.php`** — Added `$savedUrls` public array property, populated in `mount()` via repository injection. Added `toggleSave(string $url)` action that toggles save/remove and refreshes `$savedUrls`. Added private `findPaperByUrl()` helper that walks the nested `digest[].sections[].items[]` structure and extracts the paper with discipline/source context. Streaming render now passes `$savedUrls` to the partial.
+
+- **Modified: `resources/views/livewire/partials/digest-section.blade.php`** — Paper title wrapped in flex container with bookmark toggle button. When `$savedUrls` is defined (Livewire render): functional toggle with `wire:click="toggleSave(...)"`, filled amber bookmark icon when saved, outline gray when not. When `$savedUrls` is not defined (streaming render): inert gray placeholder icon, no `wire:click`.
+
+- **Modified: `resources/views/livewire/digest-viewer.blade.php`** — `@include` now passes `$savedUrls` to the digest-section partial.
+
+- **New file: `app/Livewire/SavedPapers.php`** — Full-page Livewire component at `/saved`. Methods: `mount()` (loads papers), `removePaper()` (single remove), `clearAll()` (with `wire:confirm`), `export()` (JSON streamDownload).
+
+- **New file: `resources/views/livewire/saved-papers.blade.php`** — Breadcrumb navigation, header with count and Export/Clear All buttons, empty state with bookmark icon and link to digest, paper cards with title link, discipline badge (indigo), source badge (gray), relative timestamp, also_in badges, ELI5/SWE/Investor sections (same color-coded borders as digest), X remove button, and footer persistence note.
+
+- **Modified: `routes/web.php`** — Added `Route::get('/saved', SavedPapers::class)->name('saved.index')`.
+
+- **Modified: `resources/views/components/layouts/app.blade.php`** — Added `@inject('savedPapers', ...)` and "Saved" nav link after "Digest" with amber count badge when `count > 0`.
+
+- **Modified: `tests/Browser/DigestFeaturesTest.php`** — Added 3 new Dusk test cases: bookmark button present on generated digest, bookmark toggle saves paper (verifies on `/saved` page), empty state on `/saved` page. Added `tearDown()` to clean up `saved-papers.json`.
+
+- **Updated documentation:** BACKLOG.md (RDIG-019 added to Done, removed from Parking Lot), PROGRESS.md (this entry).
+
+### Test suite
+
+- 84 unit/feature tests, 587 assertions — all passing
+- 20 new unit tests (SavedPapersRepositoryTest)
+- 3 new Dusk test cases (DigestFeaturesTest)
+
+### Decisions made
+
+- **JSON file over database** — Consistent with the project's no-database architecture. File at `storage/app/saved-papers.json` is already git-ignored by the existing wildcard.
+- **Stateless repository with in-memory cache** — Avoids redundant file reads within the same request. Fresh instance per request ensures consistency.
+- **Dedup by URL on save** — Re-saving the same paper updates `saved_at` timestamp rather than creating duplicates.
+- **Streaming render uses inert placeholder** — During `$this->stream()`, `$savedUrls` is not available in the Blade context, so an inert gray bookmark icon is shown. After the action completes and Livewire re-renders, the functional toggle replaces it.
+- **`@inject` in layout** — Provides the saved papers count to the nav badge without modifying every Livewire component that uses the layout.
+
+### What's next
+
+- Commit all changes
+- Parking lot ideas available for future work
