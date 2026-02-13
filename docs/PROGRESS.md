@@ -573,3 +573,42 @@ Added a "Saved Papers" feature that lets users bookmark individual papers from t
 
 - Commit all changes
 - Parking lot ideas available for future work
+
+---
+
+## 2026-02-13 — Docker Setup for Local Development (RDIG-020)
+
+### Summary
+
+Added Docker support for zero-friction local development, addressing GitHub issue #3. Three-stage multi-stage Dockerfile handles composer deps, Vite/Tailwind build (with vendor for `@source` scanning), and a `php:8.4-cli` runtime. Named volume persists saved papers, cache, and sessions across restarts.
+
+### What was done
+
+- **New file: `.dockerignore`** — Excludes `vendor/`, `node_modules/`, `.git/`, `.env`, IDE dirs, test artifacts, `public/build/`, `bootstrap/cache/*.php`, and docs from Docker build context
+- **New file: `docker-entrypoint.sh`** — Runtime init script: copies `.env.example` → `.env` if missing, generates `APP_KEY` via `key:generate --show` + `sed`, caches config/routes/views, then `exec "$@"`
+- **New file: `Dockerfile`** — Three-stage build:
+  - Stage 1: `composer:2` with `--no-dev --ignore-platform-req=php+` (composer image ships PHP 8.5, lockfile deps cap at 8.4)
+  - Stage 2: `node:20-alpine` runs `npm ci` + `npm run build` with vendor copied from stage 1 (Tailwind v4 `@source` needs vendor blade files)
+  - Stage 3: `php:8.4-cli` with bcmath, opcache, pcntl, zip extensions; `php artisan package:discover` regenerates manifest for production-only deps; `artisan serve` as CMD
+- **New file: `docker-compose.yml`** — Single `app` service, port 8000, `env_file: .env`, named volume `app-storage` for `storage/`, `restart: unless-stopped`
+- **Modified: `README.md`** — Added "Docker (recommended)" subsection to Quickstart with 4-line setup instructions; existing setup moved under "Local" subheading
+- **Updated documentation:** BACKLOG.md (RDIG-020 added to Done), TECH_SPEC.md (new Docker / Deployment section), PROGRESS.md (this entry)
+- Committed as `08754f0`
+
+### Issues encountered and resolved
+
+1. **`composer:2` ships PHP 8.5** — `nette/schema v1.3.2` in lockfile requires PHP 8.1–8.4. Fixed with `--ignore-platform-req=php+` since the final runtime is `php:8.4-cli`
+2. **`bootstrap/cache/packages.php` from local dev** — Referenced dev-only service providers (Dusk, Pail, Sail, Collision) causing crash loop. Fixed by adding `bootstrap/cache/*.php` to `.dockerignore` and running `php artisan package:discover` in the Dockerfile
+3. **`key:generate --force` failed silently** — Warning "No APP_KEY variable was found in the .env file" despite `APP_KEY=` being present. Replaced with `key:generate --show` + `sed` for reliable key writing
+
+### Decisions made
+
+- **Three stages, not two** — Tailwind v4 `@source` directives scan vendor blade files, requiring composer output in the node build stage
+- **`php:8.4-cli` base** — No nginx/apache needed; `artisan serve` is sufficient for single-user local tool
+- **`--no-dev` on composer** — Dusk, Pail, PHPUnit not needed in runtime image
+- **APP_KEY generated at container start** — Not baked into image layer; uses `--show` + `sed` instead of `--force` for reliability
+- **Named volume for `storage/`** — Saved papers, AI summary cache, and sessions persist across container restarts and rebuilds
+
+### What's next
+
+- Parking lot ideas available for future work

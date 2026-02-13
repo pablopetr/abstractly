@@ -54,6 +54,31 @@ _No items._
 
 ## Done
 
+### RDIG-020: Docker Setup for Local Development
+
+#### Description
+
+Added Docker support for zero-friction local development. Three-stage multi-stage Dockerfile: (1) `composer:2` installs production PHP deps with `--no-dev`, (2) `node:20-alpine` runs Vite/Tailwind build with vendor available for Tailwind v4 `@source` scanning, (3) `php:8.4-cli` final runtime with `artisan serve`. Runtime entrypoint handles `.env` copying, APP_KEY generation, and config/route/view caching. Named volume persists saved papers, cache, and sessions across container restarts. No nginx/apache — PHP's built-in server is sufficient for this single-user local tool. Addresses GitHub issue #3.
+
+#### Acceptance Criteria
+
+- [x] `docker compose build` completes without errors
+- [x] `docker compose up` starts the app on port 8000
+- [x] Health check (`/up`) returns 200
+- [x] Tailwind CSS assets are served correctly (three-stage build works end-to-end)
+- [x] Saved papers, cache, and sessions persist across container restarts via named volume
+- [x] README updated with Docker quickstart instructions
+
+#### Metadata
+
+- **Status:** Done
+- **Priority:** Medium
+- **Type:** DevOps
+- **Assignee:** Unassigned
+- **GitHub Issue:** #3
+
+---
+
 ### RDIG-019: Saved Papers
 
 #### Description

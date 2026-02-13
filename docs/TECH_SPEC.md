@@ -336,6 +336,70 @@ Graceful degradation: placeholder text on failure per batch.
 
 ---
 
+## Docker / Deployment
+
+The project includes a Docker setup for zero-friction local development. Clone, configure one env var, `docker compose up`, done.
+
+### Container Architecture
+
+Three-stage multi-stage Dockerfile:
+
+```
+Stage 1 — composer:2
+  └─ composer install --no-dev --ignore-platform-req=php+
+
+Stage 2 — node:20-alpine
+  ├─ npm ci
+  ├─ COPY vendor/ from stage 1 (Tailwind v4 @source scans vendor blade files)
+  └─ npm run build → produces public/build/
+
+Stage 3 — php:8.4-cli (final image)
+  ├─ Extensions: bcmath, opcache, pcntl, zip
+  ├─ COPY app source + vendor from stage 1 + public/build from stage 2
+  ├─ php artisan package:discover (regenerates manifest for --no-dev deps)
+  └─ ENTRYPOINT → docker-entrypoint.sh
+      CMD → php artisan serve --host=0.0.0.0 --port=8000
+```
+
+**Why three stages:** Tailwind v4 `@source` directives in `resources/css/app.css` scan `vendor/` blade files (e.g., Laravel pagination, Livewire). The composer stage feeds vendor to both the node build stage and the final runtime image.
+
+**Why `php:8.4-cli`:** No webserver needed — `artisan serve` is sufficient for a single-user local tool. Debian-based (not Alpine) for reliable extension installs.
+
+### Runtime Entrypoint (`docker-entrypoint.sh`)
+
+Runs at container start (not baked into the image):
+
+1. Copies `.env.example` → `.env` if no `.env` file exists
+2. Generates `APP_KEY` via `key:generate --show` + `sed` if not set
+3. Caches config, routes, and views for performance
+4. `exec "$@"` passes through to CMD
+
+### Docker Compose
+
+```yaml
+services:
+  app:
+    build: .
+    ports: ["8000:8000"]
+    env_file: [.env]           # passes AI API keys into the container
+    volumes:
+      - app-storage:/var/www/html/storage   # persists saved papers, cache, sessions
+    restart: unless-stopped
+```
+
+Named volume `app-storage` persists `storage/` across container restarts and image rebuilds. To reset all data: `docker compose down -v`.
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `Dockerfile` | Three-stage build (composer → node → php) |
+| `docker-entrypoint.sh` | Runtime init (env, key, caching) |
+| `docker-compose.yml` | Service definition, port mapping, volume |
+| `.dockerignore` | Excludes vendor, node_modules, .git, .env, IDE dirs, test artifacts |
+
+---
+
 ## Security & Privacy Notes
 
 - No user authentication currently (single-user, session-based)
