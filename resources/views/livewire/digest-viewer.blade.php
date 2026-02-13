@@ -14,7 +14,13 @@
             <p class="mt-1 text-sm text-gray-600">AI-powered summaries from your selected sources.</p>
         </div>
 
-        <div class="flex gap-2 shrink-0">
+        <div class="flex items-center gap-3 shrink-0">
+            <label class="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
+                <input type="checkbox" wire:model="forceRefresh"
+                       class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                Skip cache
+            </label>
+
             <button wire:click="generate"
                     wire:loading.attr="disabled"
                     wire:target="generate"

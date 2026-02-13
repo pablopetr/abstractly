@@ -2,16 +2,27 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class SourcePreviewer
 {
-    public function fetch(array $source, int $limit = 5): array
+    public function fetch(array $source, int $limit = 5, bool $forceRefresh = false): array
     {
         $key = $source['key'] ?? '';
         $url = $source['url'] ?? '';
+        $ttl = (int) config('sources.cache_ttl', 3600);
+        $cacheKey = 'source_preview:' . md5($url . '|' . $limit);
 
-        return match (true) {
+        if ($forceRefresh) {
+            Cache::forget($cacheKey);
+        }
+
+        if ($ttl > 0 && ! $forceRefresh && Cache::has($cacheKey)) {
+            return Cache::get($cacheKey);
+        }
+
+        $result = match (true) {
             // arXiv Atom
             $key === 'arxiv_math'                => $this->fetchArxiv($url, $limit),
 
@@ -30,6 +41,12 @@ class SourcePreviewer
             // fallback: try RSS/Atom
             default                             => $this->fetchRssOrAtom($url, $limit),
         };
+
+        if ($ttl > 0) {
+            Cache::put($cacheKey, $result, $ttl);
+        }
+
+        return $result;
     }
 
     /** Shared HTTP client with browser-like headers */

@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Services\SourcePreviewer;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -304,6 +305,105 @@ XML;
             'key' => 'some_feed',
             'url' => 'https://example.com/feed.xml',
         ]);
+    }
+
+    // ------------------------------------------------------------------
+    // Caching
+    // ------------------------------------------------------------------
+
+    public function test_fetch_caches_result_on_first_call(): void
+    {
+        Http::fake([
+            'export.arxiv.org/*' => Http::response($this->arxivAtomXml(), 200),
+        ]);
+
+        config(['sources.cache_ttl' => 3600]);
+
+        $source = [
+            'key' => 'arxiv_math',
+            'url' => 'https://export.arxiv.org/api/query?search_query=cat:math.AG&max_results=5',
+        ];
+
+        $this->previewer->fetch($source, 5);
+
+        $cacheKey = 'source_preview:' . md5($source['url'] . '|5');
+        $this->assertTrue(Cache::has($cacheKey));
+    }
+
+    public function test_fetch_returns_cached_without_http(): void
+    {
+        Http::fake([
+            'export.arxiv.org/*' => Http::response($this->arxivAtomXml(), 200),
+        ]);
+
+        config(['sources.cache_ttl' => 3600]);
+
+        $source = [
+            'key' => 'arxiv_math',
+            'url' => 'https://export.arxiv.org/api/query?search_query=cat:math.AG&max_results=5',
+        ];
+
+        $this->previewer->fetch($source, 5);
+        $this->previewer->fetch($source, 5);
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_fetch_force_refresh_bypasses_cache(): void
+    {
+        Http::fake([
+            'export.arxiv.org/*' => Http::response($this->arxivAtomXml(), 200),
+        ]);
+
+        config(['sources.cache_ttl' => 3600]);
+
+        $source = [
+            'key' => 'arxiv_math',
+            'url' => 'https://export.arxiv.org/api/query?search_query=cat:math.AG&max_results=5',
+        ];
+
+        $this->previewer->fetch($source, 5);
+        $this->previewer->fetch($source, 5, forceRefresh: true);
+
+        Http::assertSentCount(2);
+    }
+
+    public function test_fetch_different_limits_different_keys(): void
+    {
+        Http::fake([
+            'export.arxiv.org/*' => Http::response($this->arxivAtomXml(), 200),
+        ]);
+
+        config(['sources.cache_ttl' => 3600]);
+
+        $source = [
+            'key' => 'arxiv_math',
+            'url' => 'https://export.arxiv.org/api/query?search_query=cat:math.AG&max_results=5',
+        ];
+
+        $this->previewer->fetch($source, 5);
+        $this->previewer->fetch($source, 3);
+
+        Http::assertSentCount(2);
+    }
+
+    public function test_fetch_no_cache_when_ttl_zero(): void
+    {
+        Http::fake([
+            'export.arxiv.org/*' => Http::response($this->arxivAtomXml(), 200),
+        ]);
+
+        config(['sources.cache_ttl' => 0]);
+
+        $source = [
+            'key' => 'arxiv_math',
+            'url' => 'https://export.arxiv.org/api/query?search_query=cat:math.AG&max_results=5',
+        ];
+
+        $this->previewer->fetch($source, 5);
+        $this->previewer->fetch($source, 5);
+
+        Http::assertSentCount(2);
     }
 
     // ------------------------------------------------------------------

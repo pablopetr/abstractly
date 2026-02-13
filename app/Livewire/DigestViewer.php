@@ -15,6 +15,7 @@ class DigestViewer extends Component
 {
     public array $digest = [];
     public bool $generating = false;
+    public bool $forceRefresh = false;
     public int $limitPerSource = 5;
 
     protected int $requestTimeout = 120;
@@ -58,7 +59,7 @@ class DigestViewer extends Component
             $sections = [];
             foreach ($sourcesForSlug as $src) {
                 try {
-                    $items = $previewer->fetch($src, $this->limitPerSource);
+                    $items = $previewer->fetch($src, $this->limitPerSource, $this->forceRefresh);
                 } catch (\Throwable $e) {
                     $items = [];
                 }

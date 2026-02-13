@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'cache_ttl' => env('SOURCE_CACHE_TTL', 3600),
+
     'list' => [
         // ============================
         // TIER 1: arXiv (rich Atom)

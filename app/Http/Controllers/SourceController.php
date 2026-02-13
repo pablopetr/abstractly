@@ -24,8 +24,10 @@ class SourceController extends Controller
         $limit = (int) ($request->query('limit', 5));
         $limit = max(1, min($limit, 10)); // cap 10 for demo
 
+        $forceRefresh = (bool) $request->query('fresh', false);
+
         try {
-            $items = $previewer->fetch($source, $limit);
+            $items = $previewer->fetch($source, $limit, $forceRefresh);
         } catch (\Throwable $e) {
             $items = [];
             $error = $e->getMessage();
