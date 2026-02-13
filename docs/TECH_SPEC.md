@@ -201,6 +201,7 @@ Laravel 12 (PHP 8.2+) + Livewire 3
 │     └── AiSummarizer           (multi-provider AI summaries)
 │
 ├── Config
+│     ├── ai.php                  (AI provider settings — centralizes env vars)
 │     ├── disciplines.php         (discipline registry)
 │     └── sources.php             (source registry)
 │
@@ -285,7 +286,7 @@ HTTP client: browser-like headers, 2 retries, 20s timeout.
 
 ### AI Summarization (`AiSummarizer`)
 
-Provider selection via `DIGEST_AI_PROVIDER` env var:
+Provider selection via `config('ai.provider')` (backed by `DIGEST_AI_PROVIDER` env var, centralized in `config/ai.php`):
 
 | Provider | Model | Batch Size | Timeout |
 |----------|-------|------------|---------|
@@ -341,7 +342,15 @@ Graceful degradation: placeholder text on failure per batch.
 - **Runner:** PHPUnit 11 (`phpunit.xml`)
 - **Run command:** `composer test` (clears config cache, runs `php artisan test`)
 - **Environment:** In-memory SQLite, array session/cache, sync queue
-- **Current coverage:** Example tests only (basic redirect assertion)
+
+**Unit test coverage (21 test cases across 2 files):**
+
+| Test File | Cases | Coverage |
+|-----------|-------|----------|
+| `SourcePreviewerTest` | 12 | All 5 parser types (Atom, bioRxiv JSON, OSF JSON:API, Europe PMC, RSS/Atom fallback), limit, empty feed, HTTP errors |
+| `AiSummarizerTest` | 9 | Gemini/OpenAI/Ollama happy paths, missing API keys, API failures, batch splitting, unknown provider fallback, missing index placeholder |
+
+All tests use `Http::fake()` — no real external requests.
 
 ### E2E / Browser Tests (Dusk)
 

@@ -259,3 +259,37 @@ Architectural simplification: removed database dependency entirely. The app is a
 - Remaining backlog: RDIG-002 (caching), RDIG-003 (queue jobs), RDIG-004 (legacy controllers), RDIG-005 (unit tests), RDIG-008 (dedup), RDIG-009 (wire:navigate)
 - Update local `.env` to match new `.env.example` drivers
 - Law and Arts disciplines still need sources
+
+---
+
+## 2026-02-12 — Config Refactor, Unit Tests, and .env Update (RDIG-005)
+
+### Summary
+
+Centralized AI provider configuration into `config/ai.php`, added comprehensive unit tests for both core services (21 test cases total), cleaned up dead code in `SourcePreviewer`, and updated local `.env` to match the new no-database `.env.example`. Documentation sync triggered by reaching 5 completed backlog items.
+
+### What was done
+
+- **`config/ai.php` created:** Centralizes all AI provider env vars (`DIGEST_AI_PROVIDER`, `GOOGLE_API_KEY`, `DIGEST_AI_MODEL`, `OPENAI_API_KEY`, `DIGEST_AI_MODEL_OPENAI`, `OLLAMA_HOST`, `DIGEST_AI_MODEL_OLLAMA`) into proper Laravel config
+- **`AiSummarizer` refactored:** All `env()` calls replaced with `config('ai.*')` calls for consistency with Laravel conventions
+- **`SourcePreviewer` cleaned:** Removed dead `hal_math` case from the match statement
+- **Unit tests added (RDIG-005):**
+  - `SourcePreviewerTest` — 12 test cases covering all 5 parser types, limit, empty feed, HTTP errors
+  - `AiSummarizerTest` — 9 test cases covering all 3 providers, missing keys, failures, batching, fallback, placeholder
+- **`.env` updated:** `APP_NAME=Abstractly`, DB_CONNECTION/DB_DATABASE commented out
+- **Documentation sync:**
+  - TECH_SPEC: `config/ai.php` added to architecture diagram, AI config reference updated, unit test coverage table added
+  - BACKLOG: RDIG-005 moved to Done
+  - PROGRESS: this entry
+- Committed as `90bce15` (code + tests), documentation committed separately
+
+### Decisions made
+
+- All AI config centralized in `config/ai.php` — `AiSummarizer` no longer calls `env()` directly
+- `APP_ENV=dusk` left as-is in `.env` (activates Http::fake() stubs in AppServiceProvider — user aware)
+- Dead `hal_math` source case removed rather than left as commented-out code
+
+### What's next
+
+- Remaining backlog: RDIG-002 (caching), RDIG-003 (queue jobs), RDIG-004 (legacy controllers), RDIG-008 (dedup), RDIG-009 (wire:navigate)
+- Law and Arts disciplines still need sources

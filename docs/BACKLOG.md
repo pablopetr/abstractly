@@ -96,30 +96,6 @@ Digest generation currently runs synchronously inside the `DigestViewer` Livewir
 
 ---
 
-### RDIG-005: Add unit tests for SourcePreviewer and AiSummarizer services
-
-#### Description
-
-The two core services — `SourcePreviewer` (feed fetching and parsing) and `AiSummarizer` (multi-provider AI summarization) — contain significant logic with no test coverage. Current unit and feature tests are Laravel example stubs only. `SourcePreviewer` now handles 5 parser types (arXiv Atom, bioRxiv/medRxiv JSON, OSF Preprints JSON:API, Europe PMC REST JSON, and fallback RSS/Atom). `AiSummarizer` handles batch processing, multi-provider dispatch, error handling, and placeholder fallback behavior. Mocked HTTP responses should verify parsing correctness, batching logic, error paths, and graceful degradation. Note: canned response patterns already exist in `AppServiceProvider` for Dusk and can be reused.
-
-#### Acceptance Criteria
-
-- [ ] Unit tests exist for `SourcePreviewer` covering all 5 parser types (Atom, bioRxiv JSON, OSF JSON:API, Europe PMC JSON, RSS fallback)
-- [ ] Unit tests exist for `AiSummarizer` covering at least one provider's happy path and failure/placeholder path
-- [ ] HTTP calls are mocked (no real external requests in tests)
-- [ ] Tests run via `composer test` without additional setup
-- [ ] All new tests pass
-
-#### Metadata
-
-- **Status:** Planned
-- **Priority:** Medium
-- **Type:** Maintenance
-- **Assignee:** Unassigned
-- **GitHub Issue:** No
-
----
-
 ### RDIG-006: Persist user selections to database
 
 #### Description
@@ -245,6 +221,30 @@ Added all 6 AI-provider environment variables to `.env.example` with descriptive
 
 - **Status:** Done
 - **Priority:** High
+- **Type:** Maintenance
+- **Assignee:** Unassigned
+- **GitHub Issue:** No
+
+---
+
+### RDIG-005: Add unit tests for SourcePreviewer and AiSummarizer services
+
+#### Description
+
+Added comprehensive unit tests for both core services. `SourcePreviewerTest` covers all 5 parser types (Atom, bioRxiv JSON, OSF JSON:API, Europe PMC JSON, RSS/Atom fallback) plus limit enforcement, empty feeds, and HTTP errors (12 test cases). `AiSummarizerTest` covers Gemini/OpenAI/Ollama happy paths, missing API keys, API failures, batch splitting, unknown provider fallback, and missing summary index placeholder (9 test cases). All tests use `Http::fake()` — no real external requests. Completed alongside the `config/ai.php` refactor in commit `90bce15`.
+
+#### Acceptance Criteria
+
+- [x] Unit tests exist for `SourcePreviewer` covering all 5 parser types (Atom, bioRxiv JSON, OSF JSON:API, Europe PMC JSON, RSS fallback)
+- [x] Unit tests exist for `AiSummarizer` covering at least one provider's happy path and failure/placeholder path
+- [x] HTTP calls are mocked (no real external requests in tests)
+- [x] Tests run via `composer test` without additional setup
+- [x] All new tests pass
+
+#### Metadata
+
+- **Status:** Done
+- **Priority:** Medium
 - **Type:** Maintenance
 - **Assignee:** Unassigned
 - **GitHub Issue:** No
