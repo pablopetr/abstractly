@@ -308,6 +308,10 @@ Output per item:
 
 Structured JSON output enforced via `response_mime_type` (Gemini) or `response_format` (OpenAI).
 
+**Caching:** Summaries are cached per paper URL (keyed on `ai_summary:` + md5 of lowercase URL). Cached papers skip the AI call entirely on repeat generations. TTL configurable via `AI_SUMMARY_CACHE_TTL` (default 24h, 0 disables). Cache is bypassed when "Skip cache" is checked.
+
+**Rate limiting:** Configurable inter-batch delay (`AI_BATCH_DELAY_MS`, default 200ms) via `usleep()` between batches. All providers use `->retry(2)` with exponential backoff on 429 responses.
+
 Graceful degradation: placeholder text on failure per batch.
 
 ---
@@ -319,7 +323,7 @@ Graceful degradation: placeholder text on failure per batch.
 | arXiv API | Research papers (Atom) | None |
 | bioRxiv API | Preprints (JSON) | None |
 | medRxiv API | Preprints (JSON) | None |
-| OSF Preprints API | PsyArXiv, SocArXiv, EdArXiv (JSON:API) | None |
+| OSF Preprints API | PsyArXiv, SocArXiv, EdArXiv, LawArXiv, MediArXiv (JSON:API) | None |
 | Europe PMC REST API | Aggregated preprints by topic (JSON) | None |
 | Google Gemini API | AI summarization (default) | `GOOGLE_API_KEY` |
 | OpenAI API | AI summarization (optional) | `OPENAI_API_KEY` |
@@ -368,7 +372,7 @@ All tests use `Http::fake()` — no real external requests. `composer test` clea
 - **Driver:** `chrome-headless-shell-mac-arm64` (macOS ARM64)
 - **Window:** 1920x1080
 
-**E2E test coverage (47 test cases across 8 files):**
+**E2E test coverage (47 test cases across 7 files):**
 
 | Test File | Cases | Coverage |
 |-----------|-------|----------|

@@ -1,8 +1,8 @@
 # Abstractly
 
-A research radar for tracking AI trends and translating emerging techniques into practical applications. Aggregates newly published scientific research from open-access sources and generates AI-assisted digests with multiple perspectives.
+A research radar for tracking scientific trends and translating emerging techniques into practical applications. Aggregates newly published research from open-access sources across 15 disciplines and generates AI-assisted digests with multiple perspectives.
 
-> **Status:** Early development (v0.1)
+> **Status:** Active development (v0.1)
 
 ---
 
@@ -16,23 +16,30 @@ A research radar for tracking AI trends and translating emerging techniques into
 
 ### Current
 
-- Browse and enable/disable research disciplines
-- Configure sources per discipline (arXiv subfields, bioRxiv, medRxiv)
+- **15 research disciplines** — mathematics, CS, neuroscience, economics, law, arts, and more
+- **51 configurable sources** — arXiv (Atom), bioRxiv/medRxiv (JSON), OSF Preprints (JSON:API), Europe PMC (JSON)
+- Browse and enable/disable disciplines, configure sources per discipline
 - Preview raw feed entries from any source
-- Generate AI-summarized digests grouped by discipline and source
-- Three summary perspectives per paper:
+- **AI-summarized digests** grouped by discipline and source with three perspectives per paper:
   - **ELI5** — plain-language explanation
-  - **SWE** — solo developer opportunity framing
+  - **Solo SWE** — developer opportunity framing
   - **Investor** — high-risk opportunity thesis
-- Multi-provider AI support (Gemini, OpenAI, Ollama)
-- Graceful degradation when AI calls fail
+- **Progressive streaming** — digest sections render as each discipline completes (Livewire 3 `$this->stream()`)
+- **Paper deduplication** — cross-listed papers collapsed within each discipline with "Also in" badges
+- **Source caching** — configurable TTL to avoid re-fetching (bypass via "Skip cache" checkbox)
+- **AI summary caching** — cached per paper URL to avoid re-summarization on repeat generations
+- **Rate limiting** — configurable inter-batch delay with 429 retry and exponential backoff
+- **JSON export** — download digest as self-describing JSON with metadata envelope (timestamp, disciplines, sources, format version)
+- **Error visibility** — amber warning banner listing any sources that failed during generation
+- **Session lifetime warnings** — help text on picker pages indicating session-based persistence
+- Multi-provider AI support (Gemini, OpenAI, Ollama) with graceful degradation on failure
 
 ### Planned
 
-- Queue-based digest generation
-- Source result caching
-- Paper deduplication across sources
 - Research radar view with trend tracking
+- Saved papers and personal trend tracking
+- Ranking by novelty or citations
+- Cross-discipline clustering
 - Integration with [The Shelf](https://github.com/akuligowski9/the-shelf) for research-to-project pipeline
 
 ---
@@ -40,10 +47,10 @@ A research radar for tracking AI trends and translating emerging techniques into
 ## Tech Stack
 
 - **Backend:** Laravel 12 (PHP 8.2+)
-- **Frontend:** Blade templates, Vite
-- **Database:** SQLite (session/cache storage)
+- **Frontend:** Livewire 3 (full-page components), Tailwind CSS v4, Alpine.js, Vite 7
+- **Storage:** File-based sessions and cache (no database)
 - **AI Providers:** Google Gemini (default), OpenAI, Ollama
-- **Data Sources:** arXiv (Atom), bioRxiv (JSON), medRxiv (JSON)
+- **Data Sources:** arXiv (Atom), bioRxiv/medRxiv (JSON), OSF Preprints (JSON:API), Europe PMC (JSON)
 
 ---
 
@@ -61,7 +68,6 @@ composer setup
 composer install
 cp .env.example .env
 php artisan key:generate
-php artisan migrate
 npm install
 npm run build
 
@@ -69,7 +75,7 @@ npm run build
 composer dev
 ```
 
-This runs the Laravel server, queue worker, log tail, and Vite dev server concurrently.
+This runs the Laravel server, queue listener, log tail, and Vite dev server concurrently.
 
 ---
 
@@ -85,6 +91,22 @@ Copy `.env.example` to `.env` and configure:
 | `OPENAI_API_KEY` | Only if provider is `openai` | OpenAI API key |
 | `DIGEST_AI_MODEL_OPENAI` | No | OpenAI model (default: `gpt-4o-mini`) |
 | `OLLAMA_HOST` | No | Ollama endpoint (default: `http://127.0.0.1:11434`) |
+| `DIGEST_AI_MODEL_OLLAMA` | No | Ollama model (default: `llama3.1`) |
+| `SOURCE_CACHE_TTL` | No | Source fetch cache in seconds (default: `3600`, 0 disables) |
+| `AI_SUMMARY_CACHE_TTL` | No | AI summary cache in seconds (default: `86400`, 0 disables) |
+| `AI_BATCH_DELAY_MS` | No | Delay between AI batches in ms (default: `200`) |
+
+---
+
+## Testing
+
+```bash
+# Unit + feature tests (64 tests, 538 assertions)
+composer test
+
+# E2E browser tests (47 tests via Laravel Dusk)
+php artisan dusk
+```
 
 ---
 
